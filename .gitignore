@@ -160,3 +160,5 @@ cython_debug/
 #.idea/
 
 Meta-Llama-3-8B-Instruct/
+llama-3-*/
+*.code-workspace
