@@ -161,4 +161,5 @@ cython_debug/
 
 Meta-Llama-3-8B-Instruct/
 llama-3-*/
+AutoGPTQ/
 *.code-workspace

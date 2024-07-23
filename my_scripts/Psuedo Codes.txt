@@ -1,0 +1,68 @@
+##################    GPTQ Psuedo Code    ##################
+
+Q ← 0_{drow × dcol}          	// Initialize the quantized output matrix Q with zeros (same size as W)
+E ← 0_{drow × B}             	// Initialize the block quantization errors matrix E with zeros (same size as W but block size in columns)
+H^{-1} ← Cholesky(H^{-1})^T  	// Compute the Cholesky decomposition of the inverse Hessian H^{-1}
+
+for i = 0, B, 2B, ... do
+	// Iterate over blocks of columns, with block size B
+
+	for j = i, ..., i + B - 1 do
+    	// Iterate over each column within the current block
+
+    	Q_{:,j} ← quant(W_{:,j})        // Quantize the weights of the j-th column in W and store in Q
+    	E_{:,j} ← (W_{:,j} - Q_{:,j}) / [H^{-1}]_{jj} // Compute the quantization error for the j-th column
+
+    	// Update the weights in the block using the quantization error and the inverse Hessian
+    	W_{:,j:(i+B)} ← W_{:,j:(i+B)} - E_{:,j} · H^{-1}_{j,j:(i+B)}
+	end for
+
+	// After processing all columns in the current block, update all remaining weights globally
+	W_{:,i:(i+B)} ← W_{:,i:(i+B)} - E_{:,i:(i+B)} · H^{-1}_{i:(i+B), i:(i+B)}
+end for
+
+
+
+
+
+
+
+##################    GPTQ++ Psuedo Code    ##################
+
+Q ← 0_{drow × dcol}          	        // Initialize the quantized output matrix Q with zeros (same size as W)
+E ← 0_{drow × B}             	        // Initialize the block quantization errors matrix E with zeros (same size as W but block size in columns)
+H^{-1} ← Cholesky(H^{-1})^T  	        // Compute the Cholesky decomposition of the inverse Hessian H^{-1}
+FAISS_Index ← initialize_FAISS()        // Initialize FAISS index
+
+for i = 0, B, 2B, ... do
+	// Iterate over blocks of columns, with block size B
+
+	for j = i, ..., i + B - 1 do
+    	// Iterate over each column within the current block
+
+    	Q_{:,j} ← quant(W_{:,j})        // Quantize the weights of the j-th column in W and store in Q
+
+    	// Compute FAISS indices for vectors (sub columns) of the j-th column
+    	for k = 0, drow, subrow_size do
+        	vector = Q[k:k+subrow_size, j]
+
+        	// Perform similarity search
+        	similar_vector, index ← FAISS_Index.search(vector)  // Find similar vector and its index
+        	if similarity_found(similar_vector, vector) then
+            	Q[k:k+subrow_size, j] ← similar_vector          // Replace current vector with similar vector from the index
+        	else
+            	FAISS_Index.add(vector) // Add vector to FAISS index only if no similar vector is found
+        	end if
+    	end for
+
+    	E_{:,j} ← (W_{:,j} - Q_{:,j}) / [H^{-1}]_{jj}           // Compute the quantization error for the j-th column after substitution
+
+    	// Update the weights in the block using the quantization error and the inverse Hessian
+    	W_{:,j:(i+B)} ← W_{:,j:(i+B)} - E_{:,j} · H^{-1}_{j,j:(i+B)}
+	end for
+
+	// After processing all columns in the current block, update all remaining weights globally
+	W_{:,i:(i+B)} ← W_{:,i:(i+B)} - E_{:,i:(i+B)} · H^{-1}_{i:(i+B), i:(i+B)}
+end for
+
+
